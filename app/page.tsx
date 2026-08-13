@@ -337,7 +337,7 @@ export default function Home() {
   const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
   const [lastLesson, setLastLesson] = useState("Choose the lane with the correct answer.");
   const [musicOn, setMusicOn] = useState(true);
-  const [musicVolume, setMusicVolume] = useState(0.85);
+  const [musicVolume, setMusicVolume] = useState(1);
   const [reducedFlash, setReducedFlash] = useState(false);
   const [practiceChoice, setPracticeChoice] = useState<number | null>(null);
   const [finalScore, setFinalScore] = useState(0);
@@ -359,6 +359,7 @@ export default function Home() {
   const gateIdRef = useRef(0);
   const coinIdRef = useRef(0);
   const audioRef = useRef<AudioContext | null>(null);
+  const audioOutputRef = useRef<GainNode | null>(null);
   const musicTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -375,6 +376,23 @@ export default function Home() {
     return audioRef.current;
   }, []);
 
+  const getAudioOutput = useCallback(() => {
+    const context = getAudio();
+    if (!audioOutputRef.current) {
+      const master = context.createGain();
+      const compressor = context.createDynamicsCompressor();
+      master.gain.value = 1.65;
+      compressor.threshold.value = -20;
+      compressor.knee.value = 18;
+      compressor.ratio.value = 5;
+      compressor.attack.value = 0.004;
+      compressor.release.value = 0.22;
+      master.connect(compressor).connect(context.destination);
+      audioOutputRef.current = master;
+    }
+    return audioOutputRef.current;
+  }, [getAudio]);
+
   const playTone = useCallback((frequency: number, duration: number, type: OscillatorType, volume = 0.06, delay = 0) => {
     if (!musicOn) return;
     const context = getAudio();
@@ -386,10 +404,10 @@ export default function Home() {
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(volume * musicVolume, start + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    oscillator.connect(gain).connect(context.destination);
+    oscillator.connect(gain).connect(getAudioOutput());
     oscillator.start(start);
     oscillator.stop(start + duration + 0.03);
-  }, [getAudio, musicOn, musicVolume]);
+  }, [getAudio, getAudioOutput, musicOn, musicVolume]);
 
   const playKick = useCallback((delay = 0, strength = 1) => {
     if (!musicOn) return;
@@ -403,10 +421,10 @@ export default function Home() {
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(0.11 * strength * musicVolume, start + 0.006);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
-    oscillator.connect(gain).connect(context.destination);
+    oscillator.connect(gain).connect(getAudioOutput());
     oscillator.start(start);
     oscillator.stop(start + 0.2);
-  }, [getAudio, musicOn, musicVolume]);
+  }, [getAudio, getAudioOutput, musicOn, musicVolume]);
 
   const playNoise = useCallback((duration: number, volume: number, highpass: number, delay = 0) => {
     if (!musicOn) return;
@@ -424,27 +442,27 @@ export default function Home() {
     filter.frequency.value = highpass;
     gain.gain.setValueAtTime(volume * musicVolume, start);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-    source.connect(filter).connect(gain).connect(context.destination);
+    source.connect(filter).connect(gain).connect(getAudioOutput());
     source.start(start);
     source.stop(start + duration);
-  }, [getAudio, musicOn, musicVolume]);
+  }, [getAudio, getAudioOutput, musicOn, musicVolume]);
 
   const playSfx = useCallback((kind: "move" | "coin" | "correct" | "wrong" | "finish") => {
-    if (kind === "move") playTone(260, 0.08, "sine", 0.025);
+    if (kind === "move") playTone(260, 0.08, "sine", 0.04);
     if (kind === "coin") {
-      playTone(880, 0.08, "square", 0.035);
-      playTone(1175, 0.11, "square", 0.025, 0.06);
+      playTone(880, 0.08, "square", 0.06);
+      playTone(1175, 0.11, "square", 0.045, 0.06);
     }
     if (kind === "correct") {
-      playTone(520, 0.12, "square", 0.05);
-      playTone(780, 0.18, "square", 0.04, 0.1);
+      playTone(520, 0.12, "square", 0.08);
+      playTone(780, 0.18, "square", 0.065, 0.1);
     }
     if (kind === "wrong") {
-      playTone(150, 0.24, "sawtooth", 0.06);
-      playTone(110, 0.28, "sawtooth", 0.04, 0.08);
+      playTone(150, 0.24, "sawtooth", 0.09);
+      playTone(110, 0.28, "sawtooth", 0.065, 0.08);
     }
     if (kind === "finish") {
-      [392, 523, 659].forEach((note, index) => playTone(note, 0.45, "triangle", 0.045, index * 0.11));
+      [392, 523, 659].forEach((note, index) => playTone(note, 0.45, "triangle", 0.075, index * 0.11));
     }
   }, [playTone]);
 
@@ -743,8 +761,8 @@ export default function Home() {
           <span>VOLUME</span>
           <input
             type="range"
-            min="0.2"
-            max="1"
+            min="0.25"
+            max="1.25"
             step="0.05"
             value={musicVolume}
             onChange={(event) => setMusicVolume(Number(event.target.value))}
@@ -988,7 +1006,7 @@ export default function Home() {
         </section>
       )}
 
-      <footer className="site-footer"><span>HERITAGE ACADEMY • DIGITAL LITERACY</span><span>PYTHON DASH v1.1</span></footer>
+      <footer className="site-footer"><span>HERITAGE ACADEMY • DIGITAL LITERACY</span><span>PYTHON DASH v1.2</span></footer>
     </main>
   );
 }

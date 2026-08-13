@@ -30,6 +30,8 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /playKick/);
   assert.match(page, /playNoise/);
   assert.match(page, /musicVolume/);
+  assert.match(page, /master\.gain\.value = 1\.65/);
+  assert.match(page, /createDynamicsCompressor/);
   assert.match(page, /UNTIMED PRACTICE/);
   assert.match(page, /STUDENT HELPER MODE/);
   assert.match(page, /CODE_BRIEFING/);
