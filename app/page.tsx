@@ -28,6 +28,9 @@ type LeaderboardEntry = {
 const ROUND_SECONDS = 40;
 const LEADERBOARD_KEY = "heritage-python-dash-leaderboard-v1";
 const LANE_TOPS = [24, 50, 76];
+const GATE_START_X = 100;
+const GATE_SPEED_PER_TICK = 0.48;
+const GATE_SPAWN_INTERVAL_MS = 6000;
 
 const QUESTIONS: Question[] = [
   {
@@ -255,7 +258,7 @@ export default function Home() {
     setFeedback(null);
     setLastLesson("Choose the lane with the correct answer.");
     setScreen("playing");
-    window.setTimeout(() => spawnGate(94), 80);
+    window.setTimeout(() => spawnGate(GATE_START_X), 80);
   }, [getAudio, playerName, spawnGate]);
 
   const moveLane = useCallback((direction: -1 | 1) => {
@@ -292,7 +295,7 @@ export default function Home() {
         return;
       }
 
-      const speed = 1.05 + elapsed * 0.004;
+      const speed = GATE_SPEED_PER_TICK;
       const nextGates = gatesRef.current
         .map((gate) => ({ ...gate, x: gate.x - speed }))
         .filter((gate) => gate.x > -25);
@@ -323,9 +326,9 @@ export default function Home() {
       gatesRef.current = nextGates;
       setGates([...nextGates]);
 
-      if (now - lastSpawnRef.current >= 4600) {
+      if (now - lastSpawnRef.current >= GATE_SPAWN_INTERVAL_MS) {
         lastSpawnRef.current = now;
-        spawnGate(110);
+        spawnGate(GATE_START_X);
       }
     }, 50);
     return () => window.clearInterval(timer);
