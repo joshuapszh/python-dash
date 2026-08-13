@@ -988,7 +988,7 @@ export default function Home() {
         </section>
       )}
 
-      <footer className="site-footer"><span>HERITAGE ACADEMY • DIGITAL LITERACY</span><span>PYTHON DASH v1.0</span></footer>
+      <footer className="site-footer"><span>HERITAGE ACADEMY • DIGITAL LITERACY</span><span>PYTHON DASH v1.1</span></footer>
     </main>
   );
 }
