@@ -35,75 +35,96 @@ const GATE_SPAWN_INTERVAL_MS = 6000;
 const QUESTIONS: Question[] = [
   {
     tag: "PRINT",
-    prompt: 'What appears when Python runs: print("Hello")?',
-    answers: ['"Hello"', "Hello", "print"],
-    correct: 1,
-    explanation: "print() displays what is inside its brackets. Quotation marks show text, but are not printed.",
-  },
-  {
-    tag: "VARIABLE",
-    prompt: "score = 10 — what does this line do?",
-    answers: ["Stores 10 in score", "Prints 10", "Adds 10"],
+    prompt: 'What does print("Hello") show?',
+    answers: ["Hello", "Goodbye", "print"],
     correct: 0,
-    explanation: "A variable is a named box. The = sign stores the value on its right.",
-  },
-  {
-    tag: "CALCULATION",
-    prompt: "apples = 4 — what is apples + 2?",
-    answers: ["42", "6", "apples2"],
-    correct: 1,
-    explanation: "Python can calculate with numbers stored in variables: 4 + 2 gives 6.",
-  },
-  {
-    tag: "IF",
-    prompt: 'score = 8; if score > 5: print("Win") — what appears?',
-    answers: ["Nothing", "5", "Win"],
-    correct: 2,
-    explanation: "An if statement runs its indented code when its condition is True. Eight is greater than five.",
-  },
-  {
-    tag: "LOOP",
-    prompt: 'for i in range(3): print("Go") — how many times is Go printed?',
-    answers: ["2 times", "3 times", "4 times"],
-    correct: 1,
-    explanation: "A for loop repeats code. range(3) gives three turns: 0, 1 and 2.",
+    explanation: "print() shows the message inside the brackets. The answer is Hello.",
   },
   {
     tag: "PRINT",
-    prompt: "name = \"Ari\"; print(name) — what appears?",
-    answers: ["name", "Ari", '"name"'],
+    prompt: "What does print(5) show?",
+    answers: ["0", "5", "print"],
     correct: 1,
-    explanation: "print(name) displays the value stored in the variable called name.",
+    explanation: "print(5) shows the number 5 on the screen.",
   },
   {
-    tag: "CALCULATION",
-    prompt: "lives = 3; lives = lives - 1 — what is lives now?",
-    answers: ["1", "2", "3"],
-    correct: 1,
-    explanation: "Python calculates 3 - 1, then stores the new value 2 back in lives.",
+    tag: "VARIABLE",
+    prompt: 'name = "Mia" — what is stored in name?',
+    answers: ["name", "5", "Mia"],
+    correct: 2,
+    explanation: "The variable called name stores the word Mia.",
   },
   {
-    tag: "IF",
-    prompt: 'coins = 2; if coins > 5: print("Bonus") — what appears?',
-    answers: ["Bonus", "Nothing", "coins"],
+    tag: "VARIABLE",
+    prompt: "score = 10 — what number is stored in score?",
+    answers: ["10", "0", "1"],
+    correct: 0,
+    explanation: "The variable called score stores the number 10.",
+  },
+  {
+    tag: "MATH",
+    prompt: "What is 2 + 3?",
+    answers: ["23", "6", "5"],
+    correct: 2,
+    explanation: "Python uses + for addition. Two plus three equals five.",
+  },
+  {
+    tag: "MATH",
+    prompt: "What is 6 - 1?",
+    answers: ["5", "6", "7"],
+    correct: 0,
+    explanation: "Python uses - for subtraction. Six minus one equals five.",
+  },
+  {
+    tag: "VARIABLE",
+    prompt: "apples is 4. What is apples + 1?",
+    answers: ["4", "5", "41"],
     correct: 1,
-    explanation: "Two is not greater than five, so the indented print() line does not run.",
+    explanation: "apples stores 4, so apples + 1 is the same as 4 + 1.",
+  },
+  {
+    tag: "COMPARE",
+    prompt: "Is 5 > 2 True or False?",
+    answers: ["False", "True", "5"],
+    correct: 1,
+    explanation: "True! Five is greater than two. The > sign means greater than.",
+  },
+  {
+    tag: "COMPARE",
+    prompt: "Is 1 > 4 True or False?",
+    answers: ["True", "False", "4"],
+    correct: 1,
+    explanation: "False. One is not greater than four.",
   },
   {
     tag: "LOOP",
-    prompt: "for step in range(2): — what is this code preparing to do?",
-    answers: ["Repeat twice", "Store step 2", "Print twice"],
+    prompt: "range(2) tells a loop to repeat how many times?",
+    answers: ["1 time", "2 times", "3 times"],
+    correct: 1,
+    explanation: "range(2) makes a loop repeat two times.",
+  },
+  {
+    tag: "LOOP",
+    prompt: "range(3) tells a loop to repeat how many times?",
+    answers: ["2 times", "4 times", "3 times"],
+    correct: 2,
+    explanation: "range(3) makes a loop repeat three times.",
+  },
+  {
+    tag: "PRINT",
+    prompt: 'What does print("Python") show?',
+    answers: ["Python", "print", "Nothing"],
     correct: 0,
-    explanation: "The loop repeats its indented instructions twice. It only prints if a print() line is included.",
+    explanation: "print() shows the word Python on the screen.",
   },
 ];
 
 const BRIEFING = [
   { code: 'print("Hello")', label: "DISPLAY", text: "print() makes words or numbers appear on screen." },
   { code: "score = 10", label: "STORE", text: "A variable is a named box that stores a value." },
-  { code: "score + 5", label: "CALCULATE", text: "Python can calculate using stored numbers." },
-  { code: "if score > 5:", label: "DECIDE", text: "if runs code only when a condition is True." },
-  { code: "for i in range(3):", label: "REPEAT", text: "A for loop repeats instructions a set number of times." },
+  { code: "2 + 3", label: "CALCULATE", text: "Python uses + and - to work with numbers." },
+  { code: "5 > 2", label: "COMPARE", text: "The > sign asks if one number is greater." },
+  { code: "range(3)", label: "REPEAT", text: "range(3) means repeat three times." },
 ];
 
 function cleanName(value: string) {
@@ -198,14 +219,16 @@ export default function Home() {
     if (screen !== "playing" || !musicOn) return;
     const context = getAudio();
     void context.resume();
-    const notes = [196, 247, 294, 247, 220, 262, 330, 262];
+    const notes = [262, 330, 392, 523, 392, 330, 294, 370, 440, 587, 440, 370];
+    const bass = [131, 147, 165, 147];
     let beat = 0;
     musicTimerRef.current = window.setInterval(() => {
       const note = notes[beat % notes.length];
-      playTone(note, 0.2, "triangle", 0.018);
-      if (beat % 2 === 0) playTone(note / 2, 0.12, "sine", 0.012);
+      playTone(note, 0.18, "triangle", 0.035);
+      if (beat % 2 === 0) playTone(bass[Math.floor(beat / 2) % bass.length], 0.3, "sine", 0.025);
+      if (beat % 4 === 2) playTone(note * 2, 0.05, "square", 0.012);
       beat += 1;
-    }, 260);
+    }, 225);
     return () => {
       if (musicTimerRef.current) window.clearInterval(musicTimerRef.current);
       musicTimerRef.current = null;
@@ -258,8 +281,10 @@ export default function Home() {
     setFeedback(null);
     setLastLesson("Choose the lane with the correct answer.");
     setScreen("playing");
+    playTone(262, 0.12, "square", 0.04);
+    playTone(392, 0.16, "square", 0.035, 0.1);
     window.setTimeout(() => spawnGate(GATE_START_X), 80);
-  }, [getAudio, playerName, spawnGate]);
+  }, [getAudio, playTone, playerName, spawnGate]);
 
   const moveLane = useCallback((direction: -1 | 1) => {
     const next = Math.max(0, Math.min(2, laneRef.current + direction));
@@ -359,7 +384,7 @@ export default function Home() {
           aria-pressed={musicOn}
           onClick={() => setMusicOn((value) => !value)}
         >
-          {musicOn ? "♪ SOUND ON" : "⊘ SOUND OFF"}
+          {musicOn ? "♫ MUSIC + SFX" : "⊘ MUTED"}
         </button>
       </header>
 
@@ -385,7 +410,7 @@ export default function Home() {
                   START RUN <span>→</span>
                 </button>
               </div>
-              <p className="control-hint"><kbd>↑</kbd><kbd>↓</kbd> Move between lanes &nbsp;•&nbsp; Pick the correct answer</p>
+              <p className="control-hint"><kbd>↑</kbd><kbd>↓</kbd> Move between lanes &nbsp;•&nbsp; Music begins when you press Start Run</p>
             </div>
           </div>
 
