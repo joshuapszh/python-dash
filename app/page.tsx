@@ -304,6 +304,7 @@ export default function Home() {
   const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
   const [lastLesson, setLastLesson] = useState("Choose the lane with the correct answer.");
   const [musicOn, setMusicOn] = useState(true);
+  const [musicVolume, setMusicVolume] = useState(0.85);
   const [reducedFlash, setReducedFlash] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
 
@@ -346,12 +347,50 @@ export default function Home() {
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, start);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(volume, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(volume * musicVolume, start + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
     oscillator.connect(gain).connect(context.destination);
     oscillator.start(start);
     oscillator.stop(start + duration + 0.03);
-  }, [getAudio, musicOn]);
+  }, [getAudio, musicOn, musicVolume]);
+
+  const playKick = useCallback((delay = 0, strength = 1) => {
+    if (!musicOn) return;
+    const context = getAudio();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const start = context.currentTime + delay;
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(155, start);
+    oscillator.frequency.exponentialRampToValueAtTime(46, start + 0.13);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.11 * strength * musicVolume, start + 0.006);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(start);
+    oscillator.stop(start + 0.2);
+  }, [getAudio, musicOn, musicVolume]);
+
+  const playNoise = useCallback((duration: number, volume: number, highpass: number, delay = 0) => {
+    if (!musicOn) return;
+    const context = getAudio();
+    const frameCount = Math.max(1, Math.floor(context.sampleRate * duration));
+    const buffer = context.createBuffer(1, frameCount, context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let index = 0; index < frameCount; index += 1) data[index] = Math.random() * 2 - 1;
+    const source = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    const start = context.currentTime + delay;
+    source.buffer = buffer;
+    filter.type = "highpass";
+    filter.frequency.value = highpass;
+    gain.gain.setValueAtTime(volume * musicVolume, start);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    source.connect(filter).connect(gain).connect(context.destination);
+    source.start(start);
+    source.stop(start + duration);
+  }, [getAudio, musicOn, musicVolume]);
 
   const playSfx = useCallback((kind: "move" | "coin" | "correct" | "wrong" | "finish") => {
     if (kind === "move") playTone(260, 0.08, "sine", 0.025);
@@ -376,23 +415,36 @@ export default function Home() {
     if (screen !== "playing" || !musicOn) return;
     const context = getAudio();
     void context.resume();
-    const notes = [262, 330, 392, 523, 392, 330, 294, 370, 440, 587, 440, 370];
-    const bass = [131, 147, 165, 147];
+    const chords = [
+      [262, 330, 392],
+      [294, 370, 440],
+      [220, 277, 330],
+      [247, 311, 370],
+    ];
+    const lead = [659, 784, 880, 784, 988, 880, 784, 659, 587, 659, 784, 988, 880, 784, 659, 587];
     let beat = 0;
     musicTimerRef.current = window.setInterval(() => {
-      const note = notes[beat % notes.length];
       const finalRush = timeLeftRef.current <= 10;
-      playTone(finalRush ? note * 1.25 : note, 0.18, "triangle", finalRush ? 0.05 : 0.035);
-      if (beat % 2 === 0) playTone(bass[Math.floor(beat / 2) % bass.length], 0.3, "sine", 0.025);
-      if (beat % 4 === 2) playTone(note * 2, 0.05, "square", 0.012);
-      if (finalRush && beat % 2 === 1) playTone(740, 0.035, "square", 0.018);
+      const step = beat % 16;
+      const chord = chords[Math.floor(beat / 16) % chords.length];
+      const root = chord[0];
+
+      if (step === 0 || step === 8 || (finalRush && (step === 4 || step === 12))) playKick(0, finalRush ? 1.2 : 1);
+      if (step === 4 || step === 12) {
+        playNoise(0.13, finalRush ? 0.075 : 0.055, 1200);
+        playTone(185, 0.1, "triangle", 0.025);
+      }
+      if (finalRush || step % 2 === 0) playNoise(0.035, finalRush ? 0.022 : 0.014, 6500);
+      if (step % 4 === 0) playTone(root / 2, 0.38, "sawtooth", finalRush ? 0.045 : 0.032);
+      if (step % 2 === 0) playTone(chord[(step / 2) % chord.length] * 2, 0.1, "square", finalRush ? 0.025 : 0.018);
+      if ([0, 3, 6, 10, 12, 15].includes(step)) playTone(lead[step] * (finalRush ? 1.12 : 1), 0.16, "triangle", finalRush ? 0.05 : 0.035);
       beat += 1;
-    }, 225);
+    }, 128);
     return () => {
       if (musicTimerRef.current) window.clearInterval(musicTimerRef.current);
       musicTimerRef.current = null;
     };
-  }, [getAudio, musicOn, playTone, screen]);
+  }, [getAudio, musicOn, playKick, playNoise, playTone, screen]);
 
   const saveScore = useCallback((newScore: number) => {
     const entry: LeaderboardEntry = { name: playerName.trim(), score: newScore, playedAt: Date.now() };
@@ -517,6 +569,7 @@ export default function Home() {
             endTimeRef.current = Math.min(endTimeRef.current + timeBonus * 1000, hardEndTimeRef.current);
             setFeedback({ good: true, text: comboBonus ? `POWER COMBO! +${timeBonus} SECONDS` : `CORRECT! +${timeBonus} SECONDS` });
             playSfx("correct");
+            if (comboBonus) [784, 988, 1175, 1568].forEach((note, index) => playTone(note, 0.28, "square", 0.055, index * 0.08));
           } else {
             comboRef.current = 0;
             setFeedback({ good: false, text: "GOOD TRY — STREAK RESET" });
@@ -559,7 +612,7 @@ export default function Home() {
       }
     }, 50);
     return () => window.clearInterval(timer);
-  }, [finishGame, playSfx, screen, spawnGate]);
+  }, [finishGame, playSfx, playTone, screen, spawnGate]);
 
   const activeGate = useMemo(
     () => gates.filter((gate) => !gate.resolved && gate.x > 18).sort((a, b) => a.x - b.x)[0],
@@ -579,6 +632,18 @@ export default function Home() {
       <header className="site-header">
         <img src="/heritage-academy.png" alt="Heritage Academy" className="school-logo" />
         <div className="game-wordmark"><span>PYTHON</span><b>DASH</b></div>
+        <label className="volume-control">
+          <span>VOLUME</span>
+          <input
+            type="range"
+            min="0.2"
+            max="1"
+            step="0.05"
+            value={musicVolume}
+            onChange={(event) => setMusicVolume(Number(event.target.value))}
+            aria-label="Music and sound volume"
+          />
+        </label>
         <button
           className="flash-button"
           type="button"
@@ -655,7 +720,7 @@ export default function Home() {
             <div><small>SCORE</small><strong>{score.toString().padStart(4, "0")}</strong></div>
             <div><small>COMBO</small><strong className="combo">×{combo}</strong></div>
             <div className="code-progress"><small>CODE GATES</small><span>{[0, 1, 2, 3, 4].map((chip) => <i key={chip} className={chip < questionsAnswered ? "lit" : ""} />)}</span></div>
-            <div className="timer-block"><small>TIME</small><strong>{timeLeft.toFixed(1)}<i>s</i></strong></div>
+            <div className="timer-block"><small>TIME</small><strong>{timeLeft.toFixed(1)}<i>s</i></strong><span className="equalizer" aria-hidden="true"><i /><i /><i /><i /><i /></span></div>
           </div>
 
           <div className={`game-stage arcade-live ${feedback && !feedback.good ? "stage-hit" : ""} ${feedback?.good ? "stage-correct" : ""} ${combo >= 3 ? "combo-active" : ""}`}>

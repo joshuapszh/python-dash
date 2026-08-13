@@ -24,6 +24,11 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /shuffleQuestions/);
   assert.match(page, /Digit1/);
   assert.match(page, /reducedFlash/);
+  assert.match(page, /playKick/);
+  assert.match(page, /playNoise/);
+  assert.match(page, /musicVolume/);
+  assert.match(css, /Bright Cyber Carnival theme/);
+  assert.match(css, /equalizer/);
   assert.match(layout, /Python Dash \| Heritage Academy/);
   assert.match(layout, /\/og\.png/);
   assert.match(css, /prefers-reduced-motion/);
