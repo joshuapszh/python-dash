@@ -16,8 +16,14 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /localStorage/);
   assert.match(page, /Heritage Academy/);
   assert.match(page, /print\(\)/);
-  assert.match(page, /if statement/);
-  assert.match(page, /for loop/);
+  assert.match(page, /tag: "IF"/);
+  assert.match(page, /tag: "LOOP"/);
+  assert.equal((page.match(/^\s+tag: "/gm) ?? []).length, 30);
+  assert.match(page, /CORRECT_TIME_BONUS = 3/);
+  assert.match(page, /MAX_ROUND_SECONDS = 60/);
+  assert.match(page, /shuffleQuestions/);
+  assert.match(page, /Digit1/);
+  assert.match(page, /reducedFlash/);
   assert.match(layout, /Python Dash \| Heritage Academy/);
   assert.match(layout, /\/og\.png/);
   assert.match(css, /prefers-reduced-motion/);
