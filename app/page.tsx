@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type Screen = "briefing" | "playing" | "results";
+type Screen = "briefing" | "practice" | "playing" | "results";
 
 type Question = {
   tag: string;
@@ -17,6 +17,7 @@ type Gate = {
   x: number;
   question: Question;
   resolved: boolean;
+  decisionEndsAt?: number;
 };
 
 type LeaderboardEntry = {
@@ -39,6 +40,8 @@ const COMBO_TIME_BONUS = 5;
 const LEADERBOARD_KEY = "heritage-python-dash-leaderboard-v1";
 const LANE_TOPS = [24, 50, 76];
 const GATE_START_X = 100;
+const GATE_DECISION_X = 56;
+const DECISION_TIME_MS = 3000;
 const GATE_SPEED_PER_TICK = 0.48;
 const GATE_SPAWN_INTERVAL_MS = 6000;
 
@@ -198,60 +201,60 @@ const QUESTIONS: Question[] = [
     explanation: "False. Three is not greater than eight.",
   },
   {
-    tag: "IF",
-    prompt: "score is 5. Does score > 2 run?",
-    answers: ["Yes", "No", "Only once"],
-    correct: 0,
-    explanation: "Yes. Five is greater than two, so the if instruction runs.",
-  },
-  {
-    tag: "IF",
-    prompt: "coins is 1. Does coins > 4 run?",
-    answers: ["Yes", "Four times", "No"],
-    correct: 2,
-    explanation: "No. One is not greater than four.",
-  },
-  {
     tag: "LOOP",
     prompt: "range(2) tells a loop to repeat how many times?",
     answers: ["1 time", "2 times", "3 times"],
     correct: 1,
-    explanation: "range(2) makes a loop repeat two times.",
+    explanation: "range(2) means repeat two times.",
   },
   {
     tag: "LOOP",
     prompt: "range(3) tells a loop to repeat how many times?",
     answers: ["2 times", "4 times", "3 times"],
     correct: 2,
-    explanation: "range(3) makes a loop repeat three times.",
+    explanation: "range(3) means repeat three times.",
   },
   {
     tag: "LOOP",
     prompt: "range(1) tells a loop to repeat how many times?",
     answers: ["1 time", "2 times", "0 times"],
     correct: 0,
-    explanation: "range(1) makes a loop repeat one time.",
+    explanation: "range(1) means repeat one time.",
   },
   {
     tag: "LOOP",
     prompt: "range(4) tells a loop to repeat how many times?",
     answers: ["3 times", "4 times", "5 times"],
     correct: 1,
-    explanation: "range(4) makes a loop repeat four times.",
+    explanation: "range(4) means repeat four times.",
   },
   {
-    tag: "LOOP",
-    prompt: "Which word means do it again?",
-    answers: ["print", "variable", "repeat"],
-    correct: 2,
-    explanation: "A loop repeats instructions—it does them again.",
-  },
-  {
-    tag: "LOOP",
-    prompt: "A loop is useful when we want to…",
-    answers: ["repeat code", "hide code", "delete code"],
+    tag: "PRINT",
+    prompt: 'What does print("Play") show?',
+    answers: ["Play", "Stop", "Nothing"],
     correct: 0,
-    explanation: "Loops are useful for repeating the same instructions.",
+    explanation: "print() shows the word Play.",
+  },
+  {
+    tag: "CODE",
+    prompt: 'Which code shows the word Go?',
+    answers: ['print("Go")', "Go = print", "show Go"],
+    correct: 0,
+    explanation: "print(\"Go\") shows the word Go.",
+  },
+  {
+    tag: "CODE",
+    prompt: "Which code shows the number 5?",
+    answers: ["5 = show", "print(5)", "number 5"],
+    correct: 1,
+    explanation: "print(5) shows the number 5.",
+  },
+  {
+    tag: "PRINT",
+    prompt: 'What does print("Fun") show?',
+    answers: ["Fun", "Run", "print"],
+    correct: 0,
+    explanation: "print() shows the word Fun.",
   },
 ];
 
@@ -306,6 +309,7 @@ export default function Home() {
   const [musicOn, setMusicOn] = useState(true);
   const [musicVolume, setMusicVolume] = useState(0.85);
   const [reducedFlash, setReducedFlash] = useState(false);
+  const [practiceChoice, setPracticeChoice] = useState<number | null>(null);
   const [finalScore, setFinalScore] = useState(0);
 
   const laneRef = useRef(1);
@@ -471,6 +475,16 @@ export default function Home() {
     setGates([...gatesRef.current]);
   }, []);
 
+  const openPractice = useCallback(() => {
+    const name = cleanName(playerName).trim();
+    if (!name) return;
+    setPlayerName(name);
+    setPracticeChoice(null);
+    void getAudio().resume();
+    playTone(523, 0.12, "square", 0.04);
+    setScreen("practice");
+  }, [getAudio, playTone, playerName]);
+
   const startGame = useCallback(() => {
     const name = cleanName(playerName).trim();
     if (!name) return;
@@ -522,9 +536,17 @@ export default function Home() {
   }, [playSfx]);
 
   useEffect(() => {
-    if (screen !== "playing") return;
+    if (screen !== "playing" && screen !== "practice") return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (["ArrowUp", "ArrowDown", "KeyW", "KeyS", "Digit1", "Digit2", "Digit3", "Numpad1", "Numpad2", "Numpad3"].includes(event.code)) event.preventDefault();
+      if (screen === "practice") {
+        const practiceLane = event.code === "Digit1" || event.code === "Numpad1" ? 0 : event.code === "Digit2" || event.code === "Numpad2" ? 1 : event.code === "Digit3" || event.code === "Numpad3" ? 2 : null;
+        if (practiceLane !== null && !event.repeat) {
+          setPracticeChoice(practiceLane);
+          playSfx(practiceLane === 0 ? "correct" : "wrong");
+        }
+        return;
+      }
       if ((event.code === "ArrowUp" || event.code === "KeyW") && !event.repeat) moveLane(-1);
       if ((event.code === "ArrowDown" || event.code === "KeyS") && !event.repeat) moveLane(1);
       if ((event.code === "Digit1" || event.code === "Numpad1") && !event.repeat) chooseLane(0);
@@ -533,7 +555,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [chooseLane, moveLane, screen]);
+  }, [chooseLane, moveLane, playSfx, screen]);
 
   useEffect(() => {
     if (screen !== "playing") return;
@@ -552,7 +574,16 @@ export default function Home() {
       const paused = now < pauseUntilRef.current;
       const speed = paused ? 0 : GATE_SPEED_PER_TICK;
       const nextGates = gatesRef.current
-        .map((gate) => ({ ...gate, x: gate.x - speed }))
+        .map((gate) => {
+          if (gate.resolved) return { ...gate, x: gate.x - speed };
+          if (gate.decisionEndsAt) {
+            return now >= gate.decisionEndsAt ? { ...gate, x: 22 } : gate;
+          }
+          const nextX = gate.x - speed;
+          return nextX <= GATE_DECISION_X
+            ? { ...gate, x: GATE_DECISION_X, decisionEndsAt: now + DECISION_TIME_MS }
+            : { ...gate, x: nextX };
+        })
         .filter((gate) => gate.x > -25);
 
       for (const gate of nextGates) {
@@ -676,12 +707,12 @@ export default function Home() {
                   id="player-name"
                   value={playerName}
                   onChange={(event) => setPlayerName(cleanName(event.target.value))}
-                  onKeyDown={(event) => { if (event.key === "Enter") startGame(); }}
+                  onKeyDown={(event) => { if (event.key === "Enter") openPractice(); }}
                   placeholder="Type your name"
                   autoComplete="off"
                   maxLength={24}
                 />
-                <button type="button" onClick={startGame} disabled={!playerName.trim()}>
+                <button type="button" onClick={openPractice} disabled={!playerName.trim()}>
                   START RUN <span>→</span>
                 </button>
               </div>
@@ -713,6 +744,38 @@ export default function Home() {
         </section>
       )}
 
+      {screen === "practice" && (
+        <section className="practice-screen">
+          <div className="practice-card">
+            <span className="practice-label">UNTIMED PRACTICE</span>
+            <h1>Try one together!</h1>
+            <p className="practice-question">What does <code>print(&quot;Hi&quot;)</code> show?</p>
+            <div className="practice-answers">
+              {["Hi", "Bye", "print"].map((answer, index) => (
+                <button
+                  type="button"
+                  key={answer}
+                  className={practiceChoice === index ? (index === 0 ? "practice-correct" : "practice-wrong") : ""}
+                  onClick={() => {
+                    setPracticeChoice(index);
+                    playSfx(index === 0 ? "correct" : "wrong");
+                  }}
+                >
+                  <span>{index + 1}</span>{answer}
+                </button>
+              ))}
+            </div>
+            <div className="practice-message" role="status">
+              {practiceChoice === null && <p>Press <kbd>1</kbd>, <kbd>2</kbd> or <kbd>3</kbd> to choose.</p>}
+              {practiceChoice === 0 && <p><b>Great!</b> print() shows the word Hi.</p>}
+              {practiceChoice !== null && practiceChoice !== 0 && <p><b>Nice try!</b> Choose answer 1: Hi.</p>}
+            </div>
+            {practiceChoice === 0 && <button className="practice-start" type="button" onClick={startGame}>START THE 40-SECOND RUN <span>→</span></button>}
+          </div>
+          <div className="practice-bot"><PythonBot /></div>
+        </section>
+      )}
+
       {screen === "playing" && (
         <section className="play-screen">
           <div className="hud">
@@ -728,7 +791,11 @@ export default function Home() {
             <div className="city city-front" aria-hidden="true" />
             <div className="question-banner">
               <span>{activeGate?.question.tag ?? "READY"}</span>
-              <p>{activeGate?.question.prompt ?? "New code incoming…"}</p>
+              <div>
+                <small>{activeGate?.decisionEndsAt ? "CHOOSE NOW — PRESS 1, 2 OR 3" : "LOOK AT THE QUESTION"}</small>
+                <p>{activeGate?.question.prompt ?? "New code incoming…"}</p>
+                <i className="decision-track"><b style={{ width: activeGate?.decisionEndsAt ? `${Math.max(0, ((activeGate.decisionEndsAt - Date.now()) / DECISION_TIME_MS) * 100)}%` : "100%" }} /></i>
+              </div>
             </div>
             <div className="lane-lines" aria-hidden="true"><i /><i /><i /></div>
             <div className="runner-marker" style={{ top: `${LANE_TOPS[lane]}%` }}>
@@ -738,7 +805,7 @@ export default function Home() {
             {gates.map((gate) => gate.question.answers.map((answer, answerLane) => (
               <div
                 key={`${gate.id}-${answerLane}`}
-                className={`answer-card lane-${answerLane} ${gate.resolved ? (answerLane === gate.question.correct ? "answer-correct" : "answer-passed") : ""}`}
+                className={`answer-card lane-${answerLane} ${!gate.resolved && answerLane === lane ? "answer-selected" : ""} ${gate.decisionEndsAt && !gate.resolved ? "answer-ready" : ""} ${gate.resolved ? (answerLane === gate.question.correct ? "answer-correct" : "answer-passed") : ""}`}
                 style={{ left: `${gate.x}%`, top: `${LANE_TOPS[answerLane]}%` }}
               >
                 <span>{answerLane + 1}</span><b>{answer}</b>

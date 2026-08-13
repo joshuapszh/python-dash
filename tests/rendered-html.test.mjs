@@ -16,7 +16,6 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /localStorage/);
   assert.match(page, /Heritage Academy/);
   assert.match(page, /print\(\)/);
-  assert.match(page, /tag: "IF"/);
   assert.match(page, /tag: "LOOP"/);
   assert.equal((page.match(/^\s+tag: "/gm) ?? []).length, 30);
   assert.match(page, /CORRECT_TIME_BONUS = 3/);
@@ -27,8 +26,12 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /playKick/);
   assert.match(page, /playNoise/);
   assert.match(page, /musicVolume/);
+  assert.match(page, /UNTIMED PRACTICE/);
+  assert.match(page, /DECISION_TIME_MS = 3000/);
   assert.match(css, /Bright Cyber Carnival theme/);
   assert.match(css, /equalizer/);
+  assert.match(css, /clamp\(30px,2\.45vw,36px\)/);
+  assert.match(css, /clamp\(23px,1\.75vw,28px\)/);
   assert.match(layout, /Python Dash \| Heritage Academy/);
   assert.match(layout, /\/og\.png/);
   assert.match(css, /prefers-reduced-motion/);
