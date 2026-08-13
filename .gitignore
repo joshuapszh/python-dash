@@ -37,6 +37,7 @@ yarn-error.log*
 /dist/
 /dist-stale/
 /local-runtime/
+/release/
 /.wrangler/
 /outputs/
 /work/

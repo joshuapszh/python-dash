@@ -31,6 +31,12 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /playNoise/);
   assert.match(page, /musicVolume/);
   assert.match(page, /UNTIMED PRACTICE/);
+  assert.match(page, /STUDENT HELPER MODE/);
+  assert.match(page, /CODE_BRIEFING/);
+  assert.match(page, /HELPER PROMPT/);
+  assert.match(page, /SKIP TO PLAYER SETUP/);
+  assert.equal((page.match(/^    label: "/gm) ?? []).length, 4);
+  assert.match(page, /ArrowRight/);
   assert.match(page, /DECISION_TIME_MS = 3000/);
   assert.match(css, /Bright Cyber Carnival theme/);
   assert.match(css, /equalizer/);

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type Screen = "briefing" | "practice" | "playing" | "results";
+type Screen = "welcome" | "codeBriefing" | "practice" | "playing" | "results";
 
 type Question = {
   tag: string;
@@ -260,12 +260,39 @@ const QUESTIONS: Question[] = [
   },
 ];
 
-const BRIEFING = [
-  { code: 'print("Hello")', label: "DISPLAY", text: "print() makes words or numbers appear on screen." },
-  { code: "score = 10", label: "STORE", text: "A variable is a named box that stores a value." },
-  { code: "2 + 3", label: "CALCULATE", text: "Python uses + and - to work with numbers." },
-  { code: "5 > 2", label: "COMPARE", text: "The > sign asks if one number is greater." },
-  { code: "range(3)", label: "REPEAT", text: "range(3) means repeat three times." },
+const CODE_BRIEFING = [
+  {
+    label: "OUTPUT",
+    title: "Make words appear",
+    code: 'print("Let\'s go!")',
+    explanation: "print() tells Python to show the message inside the brackets.",
+    result: "Let’s go!",
+    helperPrompt: "Ask: Which words will appear on the screen?",
+  },
+  {
+    label: "VARIABLE",
+    title: "Remember a value",
+    code: "score = 10",
+    explanation: "A variable is a named box. Here, the box called score stores the number 10.",
+    result: "score holds 10",
+    helperPrompt: "Ask: What value is stored inside score?",
+  },
+  {
+    label: "DECISION",
+    title: "Choose what happens",
+    code: 'score = 10\nif score > 5:\n    print("Bonus!")',
+    explanation: "if checks a condition. The indented line runs because 10 is greater than 5.",
+    result: "Bonus!",
+    helperPrompt: "Ask: Will Python show Bonus? Why?",
+  },
+  {
+    label: "LOOP",
+    title: "Repeat instructions",
+    code: 'for step in range(3):\n    print("Run!")',
+    explanation: "A loop repeats an instruction. range(3) means repeat it three times.",
+    result: "Run!  Run!  Run!",
+    helperPrompt: "Ask: How many times will Run! appear?",
+  },
 ];
 
 function cleanName(value: string) {
@@ -296,7 +323,7 @@ function PythonBot({ running = false }: { running?: boolean }) {
 }
 
 export default function Home() {
-  const [screen, setScreen] = useState<Screen>("briefing");
+  const [screen, setScreen] = useState<Screen>("welcome");
   const [playerName, setPlayerName] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [lane, setLane] = useState(1);
@@ -314,6 +341,8 @@ export default function Home() {
   const [reducedFlash, setReducedFlash] = useState(false);
   const [practiceChoice, setPracticeChoice] = useState<number | null>(null);
   const [finalScore, setFinalScore] = useState(0);
+  const [briefingStep, setBriefingStep] = useState(0);
+  const [briefingComplete, setBriefingComplete] = useState(false);
 
   const laneRef = useRef(1);
   const gatesRef = useRef<Gate[]>([]);
@@ -525,6 +554,16 @@ export default function Home() {
     window.setTimeout(() => spawnGate(GATE_START_X), 80);
   }, [getAudio, playTone, playerName, spawnGate]);
 
+  const openCodeBriefing = useCallback(() => {
+    setBriefingStep(0);
+    setScreen("codeBriefing");
+  }, []);
+
+  const finishCodeBriefing = useCallback(() => {
+    setBriefingComplete(true);
+    setScreen("welcome");
+  }, []);
+
   const moveLane = useCallback((direction: -1 | 1) => {
     const next = Math.max(0, Math.min(2, laneRef.current + direction));
     if (next !== laneRef.current) {
@@ -562,6 +601,22 @@ export default function Home() {
     window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [chooseLane, moveLane, playSfx, screen]);
+
+  useEffect(() => {
+    if (screen !== "codeBriefing") return;
+    const onBriefingKeyDown = (event: KeyboardEvent) => {
+      if (["ArrowLeft", "ArrowRight", "Enter", "Escape"].includes(event.key)) event.preventDefault();
+      if (event.repeat) return;
+      if (event.key === "ArrowLeft") setBriefingStep((step) => Math.max(0, step - 1));
+      if (event.key === "ArrowRight" || event.key === "Enter") {
+        if (briefingStep === CODE_BRIEFING.length - 1) finishCodeBriefing();
+        else setBriefingStep((step) => Math.min(CODE_BRIEFING.length - 1, step + 1));
+      }
+      if (event.key === "Escape") setScreen("welcome");
+    };
+    window.addEventListener("keydown", onBriefingKeyDown, { passive: false });
+    return () => window.removeEventListener("keydown", onBriefingKeyDown);
+  }, [briefingStep, finishCodeBriefing, screen]);
 
   useEffect(() => {
     if (screen !== "playing") return;
@@ -669,6 +724,7 @@ export default function Home() {
     () => gates.filter((gate) => !gate.resolved && gate.x > 18).sort((a, b) => a.x - b.x)[0],
     [gates],
   );
+  const activeBriefing = CODE_BRIEFING[briefingStep];
 
   const clearLeaderboard = () => {
     if (window.confirm("Clear all saved scores on this computer?")) {
@@ -714,12 +770,22 @@ export default function Home() {
         </button>
       </header>
 
-      {screen === "briefing" && (
+      {screen === "welcome" && (
         <section className="briefing-screen">
           <div className="hero-copy">
             <div className="eyebrow"><span /> 40 ACTIVE SECONDS • EARN UP TO 70</div>
             <h1>Read the code.<br /><em>Choose the answer.</em></h1>
             <p className="hero-intro">Guide Byte through the neon network. Every correct answer adds 3 seconds. Build a three-answer streak for an extra 5-second power bonus!</p>
+            <div className="booth-briefing-card">
+              <div>
+                <span>STUDENT HELPER MODE</span>
+                <strong>{briefingComplete ? "Briefing complete!" : "Explain Python before the run"}</strong>
+                <p>Four large, helper-led screens • about 60–90 seconds</p>
+              </div>
+              <button type="button" onClick={openCodeBriefing}>
+                {briefingComplete ? "RESTART BRIEFING" : "START CODE BRIEFING"} <span>→</span>
+              </button>
+            </div>
             <div className="player-entry">
               <label htmlFor="player-name">PLAYER NAME</label>
               <div className="input-row">
@@ -733,7 +799,7 @@ export default function Home() {
                   maxLength={24}
                 />
                 <button type="button" onClick={openPractice} disabled={!playerName.trim()}>
-                  START RUN <span>→</span>
+                  TRY PRACTICE <span>→</span>
                 </button>
               </div>
               <p className="control-hint"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Pick an answer lane instantly &nbsp;•&nbsp; Arrow keys collect coins</p>
@@ -742,25 +808,69 @@ export default function Home() {
 
           <div className="hero-bot"><div className="bot-glow" /><PythonBot running /></div>
 
-          <div className="lesson-panel">
-            <div className="panel-heading"><span>CODE BRIEFING</span><b>READ BEFORE YOU RUN</b></div>
-            <div className="lesson-grid">
-              {BRIEFING.map((item, index) => (
-                <article className="lesson-card" key={item.code}>
-                  <span className="lesson-number">0{index + 1}</span>
-                  <small>{item.label}</small>
-                  <code>{item.code}</code>
-                  <p>{item.text}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-
           <aside className="leaderboard-card briefing-leaderboard">
             <div className="leaderboard-title"><span>LOCAL</span><h2>TOP RUNNERS</h2></div>
             <ScoreTable entries={leaderboard} />
             {leaderboard.length > 0 && <button className="clear-scores" type="button" onClick={clearLeaderboard}>Clear scores</button>}
           </aside>
+        </section>
+      )}
+
+      {screen === "codeBriefing" && (
+        <section className="code-briefing-screen">
+          <div className="briefing-mode-head">
+            <div>
+              <span>STUDENT HELPER MODE</span>
+              <h1>Python Code Briefing</h1>
+              <p>Read the code together. No typing and no timer.</p>
+            </div>
+            <button type="button" onClick={() => setScreen("welcome")}>SKIP TO PLAYER SETUP</button>
+          </div>
+
+          <div className="briefing-stage">
+            <nav className="briefing-step-list" aria-label="Code briefing steps">
+              {CODE_BRIEFING.map((item, index) => (
+                <button
+                  type="button"
+                  key={item.label}
+                  className={index === briefingStep ? "active" : index < briefingStep ? "visited" : ""}
+                  aria-current={index === briefingStep ? "step" : undefined}
+                  onClick={() => setBriefingStep(index)}
+                >
+                  <b>{index + 1}</b><span><small>{item.label}</small>{item.title}</span>
+                </button>
+              ))}
+            </nav>
+
+            <article className="briefing-slide" aria-live="polite">
+              <div className="briefing-slide-topline">
+                <span>STEP {briefingStep + 1} OF {CODE_BRIEFING.length}</span>
+                <b>{activeBriefing.label}</b>
+              </div>
+              <h2>{activeBriefing.title}</h2>
+              <pre><code>{activeBriefing.code}</code></pre>
+              <div className="briefing-explanation">
+                <div>
+                  <small>WHAT IT MEANS</small>
+                  <p>{activeBriefing.explanation}</p>
+                </div>
+                <div className="briefing-result">
+                  <small>PYTHON’S RESULT</small>
+                  <strong>{activeBriefing.result}</strong>
+                </div>
+              </div>
+              <div className="helper-cue"><span>HELPER PROMPT</span><p>{activeBriefing.helperPrompt}</p></div>
+              <div className="briefing-navigation">
+                <button type="button" className="briefing-back" disabled={briefingStep === 0} onClick={() => setBriefingStep((step) => Math.max(0, step - 1))}>← BACK</button>
+                <p><kbd>←</kbd><kbd>→</kbd> Move through the briefing</p>
+                {briefingStep < CODE_BRIEFING.length - 1 ? (
+                  <button type="button" className="briefing-next" onClick={() => setBriefingStep((step) => step + 1)}>NEXT CODE <span>→</span></button>
+                ) : (
+                  <button type="button" className="briefing-next briefing-finish" onClick={finishCodeBriefing}>READY TO PLAY <span>✓</span></button>
+                )}
+              </div>
+            </article>
+          </div>
         </section>
       )}
 
@@ -867,7 +977,7 @@ export default function Home() {
             <div className="final-score">{finalScore.toString().padStart(4, "0")}</div>
             <div className="result-actions">
               <button type="button" onClick={startGame}>RUN AGAIN <span>↻</span></button>
-              <button className="secondary" type="button" onClick={() => { setPlayerName(""); setScreen("briefing"); }}>NEW PLAYER</button>
+              <button className="secondary" type="button" onClick={() => { setPlayerName(""); setBriefingComplete(false); setScreen("welcome"); }}>NEW PLAYER</button>
             </div>
           </div>
           <aside className="leaderboard-card results-leaderboard">
