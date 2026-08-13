@@ -34,7 +34,8 @@ type Coin = {
 };
 
 const ROUND_SECONDS = 40;
-const MAX_ROUND_SECONDS = 60;
+const MAX_ACTIVE_SECONDS = 70;
+const MAX_SESSION_SECONDS = 90;
 const CORRECT_TIME_BONUS = 3;
 const COMBO_TIME_BONUS = 5;
 const LEADERBOARD_KEY = "heritage-python-dash-leaderboard-v1";
@@ -42,7 +43,8 @@ const LANE_TOPS = [24, 50, 76];
 const GATE_START_X = 100;
 const GATE_DECISION_X = 56;
 const DECISION_TIME_MS = 3000;
-const GATE_SPEED_PER_TICK = 0.48;
+const GATE_SPEED_PER_TICK = 3.15;
+const COIN_SPEED_PER_TICK = 1.2;
 const GATE_SPAWN_INTERVAL_MS = 6000;
 
 const QUESTIONS: Question[] = [
@@ -304,6 +306,7 @@ export default function Home() {
   const [combo, setCombo] = useState(0);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
+  const [clockRunning, setClockRunning] = useState(false);
   const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
   const [lastLesson, setLastLesson] = useState("Choose the lane with the correct answer.");
   const [musicOn, setMusicOn] = useState(true);
@@ -318,8 +321,9 @@ export default function Home() {
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
   const timeLeftRef = useRef(ROUND_SECONDS);
-  const endTimeRef = useRef(0);
-  const hardEndTimeRef = useRef(0);
+  const activeTimeLeftMsRef = useRef(ROUND_SECONDS * 1000);
+  const sessionEndsAtRef = useRef(0);
+  const lastTickAtRef = useRef(0);
   const pauseUntilRef = useRef(0);
   const lastSpawnRef = useRef(0);
   const questionDeckRef = useRef<Question[]>([]);
@@ -496,13 +500,14 @@ export default function Home() {
     scoreRef.current = 0;
     comboRef.current = 0;
     timeLeftRef.current = ROUND_SECONDS;
+    activeTimeLeftMsRef.current = ROUND_SECONDS * 1000;
     questionDeckRef.current = shuffleQuestions();
     gateIdRef.current = 0;
     coinIdRef.current = 0;
     pauseUntilRef.current = 0;
     const now = Date.now();
-    endTimeRef.current = now + ROUND_SECONDS * 1000;
-    hardEndTimeRef.current = now + MAX_ROUND_SECONDS * 1000;
+    sessionEndsAtRef.current = now + MAX_SESSION_SECONDS * 1000;
+    lastTickAtRef.current = now;
     lastSpawnRef.current = now;
     setLane(1);
     setGates([]);
@@ -511,6 +516,7 @@ export default function Home() {
     setCombo(0);
     setQuestionsAnswered(0);
     setTimeLeft(ROUND_SECONDS);
+    setClockRunning(false);
     setFeedback(null);
     setLastLesson("Choose the lane with the correct answer.");
     setScreen("playing");
@@ -561,17 +567,26 @@ export default function Home() {
     if (screen !== "playing") return;
     const timer = window.setInterval(() => {
       const now = Date.now();
-      const remaining = Math.max(0, (endTimeRef.current - now) / 1000);
+      const tickDuration = Math.min(250, Math.max(0, now - lastTickAtRef.current));
+      lastTickAtRef.current = now;
+      const paused = now < pauseUntilRef.current;
+      const choosingAnswer = gatesRef.current.some(
+        (gate) => !gate.resolved && Boolean(gate.decisionEndsAt) && now < (gate.decisionEndsAt ?? 0),
+      );
+      const collectingCoin = coinsRef.current.some((coin) => !coin.collected && coin.x > 22);
+      const isActivePlay = !paused && (choosingAnswer || collectingCoin);
+      if (isActivePlay) activeTimeLeftMsRef.current = Math.max(0, activeTimeLeftMsRef.current - tickDuration);
+      const remaining = activeTimeLeftMsRef.current / 1000;
       timeLeftRef.current = remaining;
       setTimeLeft(remaining);
+      setClockRunning(isActivePlay);
 
-      if (remaining <= 0) {
+      if (remaining <= 0 || now >= sessionEndsAtRef.current) {
         window.clearInterval(timer);
         finishGame();
         return;
       }
 
-      const paused = now < pauseUntilRef.current;
       const speed = paused ? 0 : GATE_SPEED_PER_TICK;
       const nextGates = gatesRef.current
         .map((gate) => {
@@ -597,7 +612,12 @@ export default function Home() {
             const points = nextCombo >= 2 ? 200 : 100;
             scoreRef.current += points;
             comboRef.current = nextCombo;
-            endTimeRef.current = Math.min(endTimeRef.current + timeBonus * 1000, hardEndTimeRef.current);
+            activeTimeLeftMsRef.current = Math.min(
+              activeTimeLeftMsRef.current + timeBonus * 1000,
+              MAX_ACTIVE_SECONDS * 1000,
+            );
+            timeLeftRef.current = activeTimeLeftMsRef.current / 1000;
+            setTimeLeft(timeLeftRef.current);
             setFeedback({ good: true, text: comboBonus ? `POWER COMBO! +${timeBonus} SECONDS` : `CORRECT! +${timeBonus} SECONDS` });
             playSfx("correct");
             if (comboBonus) [784, 988, 1175, 1568].forEach((note, index) => playTone(note, 0.28, "square", 0.055, index * 0.08));
@@ -608,7 +628,7 @@ export default function Home() {
           }
           const coin: Coin = { id: ++coinIdRef.current, x: 58, lane: Math.floor(Math.random() * 3), collected: false };
           coinsRef.current = [...coinsRef.current, coin];
-          pauseUntilRef.current = now + 900;
+          pauseUntilRef.current = now + 1200;
           setScore(scoreRef.current);
           setCombo(comboRef.current);
           setQuestionsAnswered((count) => count + 1);
@@ -621,7 +641,7 @@ export default function Home() {
       setGates([...nextGates]);
 
       const nextCoins = coinsRef.current
-        .map((coin) => ({ ...coin, x: coin.x - (paused ? 0 : 0.7) }))
+        .map((coin) => ({ ...coin, x: coin.x - (paused ? 0 : COIN_SPEED_PER_TICK) }))
         .filter((coin) => coin.x > -8);
       for (const coin of nextCoins) {
         if (!coin.collected && coin.x <= 22) {
@@ -697,7 +717,7 @@ export default function Home() {
       {screen === "briefing" && (
         <section className="briefing-screen">
           <div className="hero-copy">
-            <div className="eyebrow"><span /> 40 SECONDS • EARN UP TO 60</div>
+            <div className="eyebrow"><span /> 40 ACTIVE SECONDS • EARN UP TO 70</div>
             <h1>Read the code.<br /><em>Choose the answer.</em></h1>
             <p className="hero-intro">Guide Byte through the neon network. Every correct answer adds 3 seconds. Build a three-answer streak for an extra 5-second power bonus!</p>
             <div className="player-entry">
@@ -783,7 +803,12 @@ export default function Home() {
             <div><small>SCORE</small><strong>{score.toString().padStart(4, "0")}</strong></div>
             <div><small>COMBO</small><strong className="combo">×{combo}</strong></div>
             <div className="code-progress"><small>CODE GATES</small><span>{[0, 1, 2, 3, 4].map((chip) => <i key={chip} className={chip < questionsAnswered ? "lit" : ""} />)}</span></div>
-            <div className="timer-block"><small>TIME</small><strong>{timeLeft.toFixed(1)}<i>s</i></strong><span className="equalizer" aria-hidden="true"><i /><i /><i /><i /><i /></span></div>
+            <div className={`timer-block ${clockRunning ? "timer-running" : "timer-paused"}`}>
+              <small>ACTIVE TIME</small>
+              <strong>{timeLeft.toFixed(1)}<i>s</i></strong>
+              <em>{clockRunning ? "RUNNING" : "PAUSED"}</em>
+              <span className="equalizer" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+            </div>
           </div>
 
           <div className={`game-stage arcade-live ${feedback && !feedback.good ? "stage-hit" : ""} ${feedback?.good ? "stage-correct" : ""} ${combo >= 3 ? "combo-active" : ""}`}>
@@ -792,7 +817,7 @@ export default function Home() {
             <div className="question-banner">
               <span>{activeGate?.question.tag ?? "READY"}</span>
               <div>
-                <small>{activeGate?.decisionEndsAt ? "CHOOSE NOW — PRESS 1, 2 OR 3" : "LOOK AT THE QUESTION"}</small>
+                <small>{clockRunning ? "CHOOSE NOW — TIMER RUNNING" : feedback ? "READ THE TIP — TIMER PAUSED" : "LOOK AT THE QUESTION — TIMER PAUSED"}</small>
                 <p>{activeGate?.question.prompt ?? "New code incoming…"}</p>
                 <i className="decision-track"><b style={{ width: activeGate?.decisionEndsAt ? `${Math.max(0, ((activeGate.decisionEndsAt - Date.now()) / DECISION_TIME_MS) * 100)}%` : "100%" }} /></i>
               </div>
@@ -826,7 +851,7 @@ export default function Home() {
           <div className="play-footer">
             <div className="keys"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><span>CHOOSE LANE</span></div>
             <p><b>BYTE SAYS:</b> {lastLesson}</p>
-            <div className="round-progress"><span style={{ width: `${(timeLeft / MAX_ROUND_SECONDS) * 100}%` }} /></div>
+            <div className="round-progress"><span style={{ width: `${(timeLeft / MAX_ACTIVE_SECONDS) * 100}%` }} /></div>
           </div>
         </section>
       )}

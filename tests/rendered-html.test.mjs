@@ -19,7 +19,11 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /tag: "LOOP"/);
   assert.equal((page.match(/^\s+tag: "/gm) ?? []).length, 30);
   assert.match(page, /CORRECT_TIME_BONUS = 3/);
-  assert.match(page, /MAX_ROUND_SECONDS = 60/);
+  assert.match(page, /MAX_ACTIVE_SECONDS = 70/);
+  assert.match(page, /MAX_SESSION_SECONDS = 90/);
+  assert.match(page, /activeTimeLeftMsRef/);
+  assert.match(page, /ACTIVE TIME/);
+  assert.match(page, /TIMER PAUSED/);
   assert.match(page, /shuffleQuestions/);
   assert.match(page, /Digit1/);
   assert.match(page, /reducedFlash/);
