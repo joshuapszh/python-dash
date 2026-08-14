@@ -755,7 +755,7 @@ export default function Home() {
     <main className={`app-shell ${reducedFlash ? "reduced-flash" : ""}`}>
       <div className="ambient-grid" aria-hidden="true" />
       <header className="site-header">
-        <img src="/heritage-academy.png" alt="Heritage Academy" className="school-logo" />
+        <img src="./heritage-academy.png" alt="Heritage Academy" className="school-logo" />
         <div className="game-wordmark"><span>PYTHON</span><b>DASH</b></div>
         <label className="volume-control">
           <span>VOLUME</span>
