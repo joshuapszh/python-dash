@@ -338,6 +338,7 @@ export default function Home() {
   const [lastLesson, setLastLesson] = useState("Choose the lane with the correct answer.");
   const [musicOn, setMusicOn] = useState(true);
   const [musicVolume, setMusicVolume] = useState(1);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [reducedFlash, setReducedFlash] = useState(false);
   const [practiceChoice, setPracticeChoice] = useState<number | null>(null);
   const [finalScore, setFinalScore] = useState(0);
@@ -466,8 +467,20 @@ export default function Home() {
     }
   }, [playTone]);
 
+  const unlockAudio = useCallback(async () => {
+    const context = getAudio();
+    getAudioOutput();
+    try {
+      await context.resume();
+    } catch {
+      // The music effect will try again after the browser completes the click.
+    }
+    setAudioUnlocked(true);
+    playSfx("correct");
+  }, [getAudio, getAudioOutput, playSfx]);
+
   useEffect(() => {
-    if (screen !== "playing" || !musicOn) return;
+    if (!audioUnlocked || !musicOn) return;
     const context = getAudio();
     void context.resume();
     const chords = [
@@ -499,7 +512,7 @@ export default function Home() {
       if (musicTimerRef.current) window.clearInterval(musicTimerRef.current);
       musicTimerRef.current = null;
     };
-  }, [getAudio, musicOn, playKick, playNoise, playTone, screen]);
+  }, [audioUnlocked, getAudio, musicOn, playKick, playNoise, playTone]);
 
   const saveScore = useCallback((newScore: number) => {
     const entry: LeaderboardEntry = { name: playerName.trim(), score: newScore, playedAt: Date.now() };
@@ -754,6 +767,23 @@ export default function Home() {
   return (
     <main className={`app-shell ${reducedFlash ? "reduced-flash" : ""}`}>
       <div className="ambient-grid" aria-hidden="true" />
+      {!audioUnlocked && (
+        <section className="sound-gate" role="dialog" aria-modal="true" aria-labelledby="sound-gate-title">
+          <div className="sound-gate-card">
+            <img src="./heritage-academy.png" alt="Heritage Academy" />
+            <span className="sound-gate-kicker">PYTHON DASH ARCADE</span>
+            <h1 id="sound-gate-title">Ready to power up?</h1>
+            <p>Enter the arcade to turn on the music and begin the Python adventure.</p>
+            <div className="sound-bars" aria-hidden="true">
+              {Array.from({ length: 14 }, (_, index) => <i key={index} />)}
+            </div>
+            <button type="button" onClick={unlockAudio} autoFocus>
+              <span aria-hidden="true">♫</span> ENTER ARCADE — TURN ON SOUND
+            </button>
+            <small>Music will continue during the briefing, practice and game.</small>
+          </div>
+        </section>
+      )}
       <header className="site-header">
         <img src="./heritage-academy.png" alt="Heritage Academy" className="school-logo" />
         <div className="game-wordmark"><span>PYTHON</span><b>DASH</b></div>
