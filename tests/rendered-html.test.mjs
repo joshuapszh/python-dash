@@ -17,7 +17,7 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /Heritage Academy/);
   assert.match(page, /print\(\)/);
   assert.match(page, /tag: "LOOP"/);
-  assert.equal((page.match(/^\s+tag: "/gm) ?? []).length, 30);
+  assert.equal((page.match(/^\s+tag: "/gm) ?? []).length, 31);
   assert.match(page, /CORRECT_TIME_BONUS = 3/);
   assert.match(page, /MAX_ACTIVE_SECONDS = 70/);
   assert.match(page, /MAX_SESSION_SECONDS = 90/);
@@ -34,6 +34,13 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /ENTER ARCADE — TURN ON SOUND/);
   assert.match(page, /Music will continue during the briefing, practice and game/);
   assert.match(page, /if \(!audioUnlocked \|\| !musicOn\) return/);
+  assert.match(page, /BOSS_QUESTION/);
+  assert.match(page, /adaptiveLevelRef/);
+  assert.match(page, /PYTHON POWER/);
+  assert.match(page, /ATTRACT_DELAY_MS = 20000/);
+  assert.match(page, /RESULTS_RESET_SECONDS = 25/);
+  assert.match(page, /PYTHON SKILLS LEARNED/);
+  assert.match(page, /PYTHON DASH v1\.3/);
   assert.match(page, /master\.gain\.value = 1\.65/);
   assert.match(page, /createDynamicsCompressor/);
   assert.match(page, /UNTIMED PRACTICE/);
@@ -47,6 +54,9 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(css, /Bright Cyber Carnival theme/);
   assert.match(css, /equalizer/);
   assert.match(css, /sound-gate/);
+  assert.match(css, /boss-active/);
+  assert.match(css, /attract-callout/);
+  assert.match(css, /result-recap/);
   assert.match(css, /clamp\(30px,2\.45vw,36px\)/);
   assert.match(css, /clamp\(23px,1\.75vw,28px\)/);
   assert.match(layout, /Python Dash \| Heritage Academy/);
