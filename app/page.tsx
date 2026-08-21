@@ -13,6 +13,12 @@ type Question = {
   boss?: boolean;
 };
 
+type Feedback = {
+  good: boolean;
+  text: string;
+  detail: string;
+};
+
 type Gate = {
   id: number;
   x: number;
@@ -35,20 +41,24 @@ type Coin = {
 };
 
 const ROUND_SECONDS = 40;
-const MAX_ACTIVE_SECONDS = 70;
-const MAX_SESSION_SECONDS = 90;
+const MAX_ACTIVE_SECONDS = 60;
+const MAX_SESSION_SECONDS = 75;
+const MISSION_GATES = 5;
 const CORRECT_TIME_BONUS = 3;
 const COMBO_TIME_BONUS = 5;
 const LEADERBOARD_KEY = "heritage-python-dash-leaderboard-v1";
 const LANE_TOPS = [24, 50, 76];
 const GATE_START_X = 100;
 const GATE_DECISION_X = 56;
-const DECISION_TIME_MS = 3000;
+const DECISION_TIME_MS = 4500;
 const GATE_SPEED_PER_TICK = 3.15;
 const COIN_SPEED_PER_TICK = 1.2;
 const GATE_SPAWN_INTERVAL_MS = 6000;
 const ATTRACT_DELAY_MS = 20000;
 const RESULTS_RESET_SECONDS = 25;
+
+const CODENAME_ADJECTIVES = ["Bright", "Brave", "Swift", "Clever", "Cosmic", "Pixel", "Turbo", "Neon"];
+const CODENAME_NOUNS = ["Panda", "Otter", "Falcon", "Tiger", "Gecko", "Dolphin", "Fox", "Koala"];
 
 const QUESTIONS: Question[] = [
   {
@@ -95,17 +105,17 @@ const QUESTIONS: Question[] = [
   },
   {
     tag: "VARIABLE",
-    prompt: 'name = "Mia" — what is stored in name?',
+    prompt: 'name = "Mia"\nprint(name) — what appears?',
     answers: ["name", "5", "Mia"],
     correct: 2,
-    explanation: "The variable called name stores the word Mia.",
+    explanation: "The variable name stores Mia, so print(name) shows Mia.",
   },
   {
     tag: "VARIABLE",
-    prompt: "score = 10 — what number is stored in score?",
+    prompt: "score = 10\nprint(score) — what appears?",
     answers: ["10", "0", "1"],
     correct: 0,
-    explanation: "The variable called score stores the number 10.",
+    explanation: "The variable score stores 10, so print(score) shows 10.",
   },
   {
     tag: "VARIABLE",
@@ -165,28 +175,28 @@ const QUESTIONS: Question[] = [
   },
   {
     tag: "MATH",
-    prompt: "apples is 4. What is apples + 1?",
+    prompt: "apples = 4\nprint(apples + 1)",
     answers: ["4", "5", "41"],
     correct: 1,
     explanation: "apples stores 4, so apples + 1 is the same as 4 + 1.",
   },
   {
     tag: "MATH",
-    prompt: "stars is 8. What is stars - 2?",
+    prompt: "stars = 8\nprint(stars - 2)",
     answers: ["10", "82", "6"],
     correct: 2,
     explanation: "stars stores 8, so stars - 2 equals 6.",
   },
   {
     tag: "COMPARE",
-    prompt: "Is 5 > 2 True or False?",
+    prompt: "print(5 > 2) — what appears?",
     answers: ["False", "True", "5"],
     correct: 1,
     explanation: "True! Five is greater than two. The > sign means greater than.",
   },
   {
     tag: "COMPARE",
-    prompt: "Is 1 > 4 True or False?",
+    prompt: "print(1 > 4) — what appears?",
     answers: ["True", "False", "4"],
     correct: 1,
     explanation: "False. One is not greater than four.",
@@ -323,6 +333,12 @@ function cleanName(value: string) {
   return value.replace(/[<>]/g, "").replace(/\s+/g, " ").slice(0, 24);
 }
 
+function makeCodename() {
+  const adjective = CODENAME_ADJECTIVES[Math.floor(Math.random() * CODENAME_ADJECTIVES.length)];
+  const noun = CODENAME_NOUNS[Math.floor(Math.random() * CODENAME_NOUNS.length)];
+  return `${adjective} ${noun}`;
+}
+
 function resultRank(score: number) {
   if (score >= 1000) return "LOOP LEGEND";
   if (score >= 700) return "PYTHON PILOT";
@@ -373,17 +389,20 @@ export default function Home() {
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
   const [clockRunning, setClockRunning] = useState(false);
-  const [feedback, setFeedback] = useState<{ good: boolean; text: string } | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [lastLesson, setLastLesson] = useState("Choose the lane with the correct answer.");
   const [musicOn, setMusicOn] = useState(true);
   const [musicVolume, setMusicVolume] = useState(1);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [reducedFlash, setReducedFlash] = useState(false);
   const [practiceChoice, setPracticeChoice] = useState<number | null>(null);
+  const [practiceLane, setPracticeLane] = useState(1);
+  const [practiceMoveComplete, setPracticeMoveComplete] = useState(false);
   const [finalScore, setFinalScore] = useState(0);
   const [briefingStep, setBriefingStep] = useState(0);
   const [briefingComplete, setBriefingComplete] = useState(false);
   const [learnedTags, setLearnedTags] = useState<string[]>([]);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
   const [attractMode, setAttractMode] = useState(false);
   const [resultsResetSeconds, setResultsResetSeconds] = useState(RESULTS_RESET_SECONDS);
 
@@ -395,7 +414,10 @@ export default function Home() {
   const bestComboRef = useRef(0);
   const adaptiveLevelRef = useRef(1);
   const learnedTagsRef = useRef<string[]>([]);
+  const correctAnswersRef = useRef(0);
+  const regularGatesRef = useRef(0);
   const bossSpawnedRef = useRef(false);
+  const missionFinishingRef = useRef(false);
   const timeLeftRef = useRef(ROUND_SECONDS);
   const activeTimeLeftMsRef = useRef(ROUND_SECONDS * 1000);
   const sessionEndsAtRef = useRef(0);
@@ -410,12 +432,15 @@ export default function Home() {
   const musicTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(LEADERBOARD_KEY) ?? "[]") as LeaderboardEntry[];
-      if (Array.isArray(saved)) setLeaderboard(saved.slice(0, 10));
-    } catch {
-      localStorage.removeItem(LEADERBOARD_KEY);
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(LEADERBOARD_KEY) ?? "[]") as LeaderboardEntry[];
+        if (Array.isArray(saved)) setLeaderboard(saved.slice(0, 10));
+      } catch {
+        localStorage.removeItem(LEADERBOARD_KEY);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const getAudio = useCallback(() => {
@@ -525,6 +550,11 @@ export default function Home() {
     playSfx("correct");
   }, [getAudio, getAudioOutput, playSfx]);
 
+  const enterSilently = useCallback(() => {
+    setMusicOn(false);
+    setAudioUnlocked(true);
+  }, []);
+
   useEffect(() => {
     if (!audioUnlocked || !musicOn) return;
     const context = getAudio();
@@ -578,13 +608,14 @@ export default function Home() {
   const finishGame = useCallback(() => {
     const total = scoreRef.current;
     setFinalScore(total);
+    setResultsResetSeconds(RESULTS_RESET_SECONDS);
     setScreen("results");
     saveScore(total);
     playSfx("finish");
   }, [playSfx, saveScore]);
 
   const spawnGate = useCallback((x: number) => {
-    const bossReady = timeLeftRef.current <= 12 && !bossSpawnedRef.current;
+    const bossReady = regularGatesRef.current >= MISSION_GATES && !bossSpawnedRef.current;
     if (questionDeckRef.current.length === 0) questionDeckRef.current = shuffleQuestions(adaptiveLevelRef.current);
     const question = bossReady ? BOSS_QUESTION : questionDeckRef.current.shift()!;
     if (bossReady) bossSpawnedRef.current = true;
@@ -597,7 +628,10 @@ export default function Home() {
     const name = cleanName(playerName).trim();
     if (!name) return;
     setPlayerName(name);
+    setAttractMode(false);
     setPracticeChoice(null);
+    setPracticeLane(1);
+    setPracticeMoveComplete(false);
     void getAudio().resume();
     playTone(523, 0.12, "square", 0.04);
     setScreen("practice");
@@ -616,7 +650,10 @@ export default function Home() {
     bestComboRef.current = 0;
     adaptiveLevelRef.current = 1;
     learnedTagsRef.current = [];
+    correctAnswersRef.current = 0;
+    regularGatesRef.current = 0;
     bossSpawnedRef.current = false;
+    missionFinishingRef.current = false;
     timeLeftRef.current = ROUND_SECONDS;
     activeTimeLeftMsRef.current = ROUND_SECONDS * 1000;
     questionDeckRef.current = shuffleQuestions(1);
@@ -635,6 +672,7 @@ export default function Home() {
     setBestCombo(0);
     setAdaptiveLevel(1);
     setLearnedTags([]);
+    setCorrectAnswers(0);
     setQuestionsAnswered(0);
     setTimeLeft(ROUND_SECONDS);
     setClockRunning(false);
@@ -648,11 +686,13 @@ export default function Home() {
 
   const openCodeBriefing = useCallback(() => {
     setBriefingStep(0);
+    setAttractMode(false);
     setScreen("codeBriefing");
   }, []);
 
   const finishCodeBriefing = useCallback(() => {
     setBriefingComplete(true);
+    setAttractMode(false);
     setScreen("welcome");
   }, []);
 
@@ -662,6 +702,17 @@ export default function Home() {
     setAttractMode(false);
     setScreen("welcome");
   }, []);
+
+  const choosePracticeLane = useCallback((next: number) => {
+    const safeLane = Math.max(0, Math.min(2, next));
+    setPracticeLane(safeLane);
+    if (safeLane === 0) {
+      setPracticeMoveComplete(true);
+      playSfx("coin");
+    } else {
+      playSfx("move");
+    }
+  }, [playSfx]);
 
   const moveLane = useCallback((direction: -1 | 1) => {
     const next = Math.max(0, Math.min(2, laneRef.current + direction));
@@ -684,10 +735,14 @@ export default function Home() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (["ArrowUp", "ArrowDown", "KeyW", "KeyS", "Digit1", "Digit2", "Digit3", "Numpad1", "Numpad2", "Numpad3"].includes(event.code)) event.preventDefault();
       if (screen === "practice") {
-        const practiceLane = event.code === "Digit1" || event.code === "Numpad1" ? 0 : event.code === "Digit2" || event.code === "Numpad2" ? 1 : event.code === "Digit3" || event.code === "Numpad3" ? 2 : null;
-        if (practiceLane !== null && !event.repeat) {
-          setPracticeChoice(practiceLane);
-          playSfx(practiceLane === 0 ? "correct" : "wrong");
+        const practiceAnswer = event.code === "Digit1" || event.code === "Numpad1" ? 0 : event.code === "Digit2" || event.code === "Numpad2" ? 1 : event.code === "Digit3" || event.code === "Numpad3" ? 2 : null;
+        if (practiceAnswer !== null && !event.repeat) {
+          setPracticeChoice(practiceAnswer);
+          playSfx(practiceAnswer === 0 ? "correct" : "wrong");
+        }
+        if (practiceChoice === 0 && !event.repeat) {
+          if (event.code === "ArrowUp" || event.code === "KeyW") choosePracticeLane(practiceLane - 1);
+          if (event.code === "ArrowDown" || event.code === "KeyS") choosePracticeLane(practiceLane + 1);
         }
         return;
       }
@@ -699,7 +754,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", onKeyDown, { passive: false });
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [chooseLane, moveLane, playSfx, screen]);
+  }, [chooseLane, choosePracticeLane, moveLane, playSfx, practiceChoice, practiceLane, screen]);
 
   useEffect(() => {
     if (screen !== "codeBriefing") return;
@@ -718,10 +773,7 @@ export default function Home() {
   }, [briefingStep, finishCodeBriefing, screen]);
 
   useEffect(() => {
-    if (screen !== "welcome" || !audioUnlocked) {
-      setAttractMode(false);
-      return;
-    }
+    if (screen !== "welcome" || !audioUnlocked) return;
     let idleTimer = window.setTimeout(() => setAttractMode(true), ATTRACT_DELAY_MS);
     const restartAttractTimer = () => {
       setAttractMode(false);
@@ -740,7 +792,6 @@ export default function Home() {
   useEffect(() => {
     if (screen !== "results") return;
     let remaining = RESULTS_RESET_SECONDS;
-    setResultsResetSeconds(remaining);
     const timer = window.setInterval(() => {
       remaining -= 1;
       setResultsResetSeconds(remaining);
@@ -818,7 +869,14 @@ export default function Home() {
             setFeedback({
               good: true,
               text: gate.question.boss ? `BOSS DEFEATED! +500 POINTS +${timeBonus}s` : comboBonus ? `POWER COMBO! +${timeBonus} SECONDS` : `CORRECT! +${timeBonus} SECONDS`,
+              detail: gate.question.explanation,
             });
+            correctAnswersRef.current += 1;
+            setCorrectAnswers(correctAnswersRef.current);
+            if (!learnedTagsRef.current.includes(gate.question.tag)) {
+              learnedTagsRef.current = [...learnedTagsRef.current, gate.question.tag];
+              setLearnedTags(learnedTagsRef.current);
+            }
             playSfx("correct");
             if (comboBonus) [784, 988, 1175, 1568].forEach((note, index) => playTone(note, 0.28, "square", 0.055, index * 0.08));
           } else {
@@ -826,21 +884,26 @@ export default function Home() {
             adaptiveLevelRef.current = Math.max(1, adaptiveLevelRef.current - 1);
             setAdaptiveLevel(adaptiveLevelRef.current);
             questionDeckRef.current = [];
-            setFeedback({ good: false, text: gate.question.boss ? "NICE TRY — BOSS TIP UNLOCKED" : "GOOD TRY — STREAK RESET" });
+            setFeedback({
+              good: false,
+              text: gate.question.boss ? "BOSS TIP UNLOCKED" : "GOOD TRY — STREAK RESET",
+              detail: `Answer ${gate.question.correct + 1}: ${gate.question.answers[gate.question.correct]}. ${gate.question.explanation}`,
+            });
             playSfx("wrong");
           }
-          if (!learnedTagsRef.current.includes(gate.question.tag)) {
-            learnedTagsRef.current = [...learnedTagsRef.current, gate.question.tag];
-            setLearnedTags(learnedTagsRef.current);
-          }
+          if (!gate.question.boss) regularGatesRef.current += 1;
           const coin: Coin = { id: ++coinIdRef.current, x: 58, lane: Math.floor(Math.random() * 3), collected: false };
           coinsRef.current = [...coinsRef.current, coin];
-          pauseUntilRef.current = now + 1200;
+          pauseUntilRef.current = now + 1800;
           setScore(scoreRef.current);
           setCombo(comboRef.current);
           setQuestionsAnswered((count) => count + 1);
           setLastLesson(gate.question.explanation);
-          window.setTimeout(() => setFeedback(null), 1150);
+          window.setTimeout(() => setFeedback(null), 1750);
+          if (gate.question.boss && !missionFinishingRef.current) {
+            missionFinishingRef.current = true;
+            window.setTimeout(finishGame, 1800);
+          }
         }
       }
 
@@ -864,7 +927,7 @@ export default function Home() {
       setCoins([...nextCoins]);
 
       const hasIncomingGate = nextGates.some((gate) => !gate.resolved);
-      if (!hasIncomingGate && now - lastSpawnRef.current >= GATE_SPAWN_INTERVAL_MS && !paused) {
+      if (!hasIncomingGate && now - lastSpawnRef.current >= GATE_SPAWN_INTERVAL_MS && !paused && !missionFinishingRef.current) {
         lastSpawnRef.current = now;
         spawnGate(GATE_START_X);
       }
@@ -898,9 +961,12 @@ export default function Home() {
             <div className="sound-bars" aria-hidden="true">
               {Array.from({ length: 14 }, (_, index) => <i key={index} />)}
             </div>
-            <button type="button" onClick={unlockAudio} autoFocus>
-              <span aria-hidden="true">♫</span> ENTER ARCADE — TURN ON SOUND
-            </button>
+            <div className="sound-gate-actions">
+              <button type="button" onClick={unlockAudio}>
+                <span aria-hidden="true">♫</span> PLAY WITH SOUND
+              </button>
+              <button className="silent-entry" type="button" onClick={enterSilently}>PLAY SILENTLY</button>
+            </div>
             <small>Music will continue during the briefing, practice and game.</small>
           </div>
         </section>
@@ -912,7 +978,7 @@ export default function Home() {
           <span>VOLUME</span>
           <input
             type="range"
-            min="0.25"
+            min="0"
             max="1.25"
             step="0.05"
             value={musicVolume}
@@ -946,12 +1012,12 @@ export default function Home() {
               <div className="attract-callout" role="status">
                 <span>★ BOOTH CHALLENGE ★</span>
                 <b>CAN YOU BEAT TODAY&apos;S HIGH SCORE?</b>
-                <small>Press any key or tap the screen to play</small>
+                <small>Choose a codename to begin</small>
               </div>
             )}
-            <div className="eyebrow"><span /> 40 ACTIVE SECONDS • EARN UP TO 70</div>
+            <div className="eyebrow"><span /> FIVE CODE GATES • ONE BOSS MISSION</div>
             <h1>Read the code.<br /><em>Choose the answer.</em></h1>
-            <p className="hero-intro">Guide Byte through the neon network. Every correct answer adds 3 seconds. Build a three-answer streak for an extra 5-second power bonus!</p>
+            <p className="hero-intro">Guide Byte through five code gates, power up with correct answers, then defeat the Python Boss!</p>
             <div className="booth-briefing-card">
               <div>
                 <span>STUDENT HELPER MODE</span>
@@ -963,22 +1029,23 @@ export default function Home() {
               </button>
             </div>
             <div className="player-entry">
-              <label htmlFor="player-name">PLAYER NAME</label>
+              <label htmlFor="player-name">PLAYER CODENAME</label>
               <div className="input-row">
                 <input
                   id="player-name"
                   value={playerName}
-                  onChange={(event) => setPlayerName(cleanName(event.target.value))}
-                  onKeyDown={(event) => { if (event.key === "Enter") openPractice(); }}
-                  placeholder="Type your name"
-                  autoComplete="off"
-                  maxLength={24}
+                  readOnly
+                  placeholder="Choose a fun codename"
+                  aria-label="Generated player codename"
                 />
+                <button className="codename-button" type="button" onClick={() => setPlayerName(makeCodename())}>
+                  {playerName ? "NEW CODENAME" : "CHOOSE CODENAME"}
+                </button>
                 <button type="button" onClick={openPractice} disabled={!playerName.trim()}>
-                  TRY PRACTICE <span>→</span>
+                  START PRACTICE <span>→</span>
                 </button>
               </div>
-              <p className="control-hint"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Pick an answer lane instantly &nbsp;•&nbsp; Arrow keys collect coins</p>
+              <p className="control-hint">Codenames keep the local leaderboard fun and student-safe.</p>
             </div>
           </div>
 
@@ -1073,10 +1140,32 @@ export default function Home() {
             </div>
             <div className="practice-message" role="status">
               {practiceChoice === null && <p>Press <kbd>1</kbd>, <kbd>2</kbd> or <kbd>3</kbd> to choose.</p>}
-              {practiceChoice === 0 && <p><b>Great!</b> print() shows the word Hi.</p>}
+              {practiceChoice === 0 && <p><b>Great!</b> print() shows the word Hi. Now collect the coin!</p>}
               {practiceChoice !== null && practiceChoice !== 0 && <p><b>Nice try!</b> Choose answer 1: Hi.</p>}
             </div>
-            {practiceChoice === 0 && <button className="practice-start" type="button" onClick={startGame}>START THE 40-SECOND RUN <span>→</span></button>}
+            {practiceChoice === 0 && (
+              <div className="practice-move" aria-label="Movement practice">
+                <p>Press <kbd>↑</kbd> or tap the glowing lane to move Byte to the coin.</p>
+                <div className="practice-lanes">
+                  {[0, 1, 2].map((laneIndex) => (
+                    <button
+                      type="button"
+                      key={laneIndex}
+                      className={`${practiceLane === laneIndex ? "active" : ""} ${laneIndex === 0 ? "target" : ""}`}
+                      onClick={() => choosePracticeLane(laneIndex)}
+                      aria-pressed={practiceLane === laneIndex}
+                      aria-label={`Move to lane ${laneIndex + 1}${laneIndex === 0 ? ", coin lane" : ""}`}
+                    >
+                      <span>{laneIndex + 1}</span>
+                      {practiceLane === laneIndex && <b>BYTE</b>}
+                      {laneIndex === 0 && !practiceMoveComplete && <i>Py</i>}
+                      {laneIndex === 0 && practiceMoveComplete && <strong>COIN COLLECTED!</strong>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {practiceChoice === 0 && practiceMoveComplete && <button className="practice-start" type="button" onClick={startGame}>START THE BOSS MISSION <span>→</span></button>}
           </div>
           <div className="practice-bot"><PythonBot /></div>
         </section>
@@ -1092,11 +1181,11 @@ export default function Home() {
               <span>{[1, 2, 3, 4, 5].map((step) => <i key={step} className={step <= Math.min(5, combo) ? "lit" : ""} />)}</span>
               <strong className="combo">{POWER_LABELS[Math.min(5, combo)]}</strong>
             </div>
-            <div className="code-progress"><small>CODE GATES</small><span>{[0, 1, 2, 3, 4].map((chip) => <i key={chip} className={chip < questionsAnswered ? "lit" : ""} />)}</span></div>
+            <div className="code-progress"><small>{activeGate?.question.boss ? "BOSS GATE" : `${Math.min(questionsAnswered, MISSION_GATES)}/${MISSION_GATES} TO BOSS`}</small><span>{Array.from({ length: MISSION_GATES }, (_, chip) => <i key={chip} className={chip < Math.min(questionsAnswered, MISSION_GATES) ? "lit" : ""} />)}</span></div>
             <div className={`timer-block ${clockRunning ? "timer-running" : "timer-paused"}`}>
-              <small>ACTIVE TIME</small>
+              <small>PYTHON ENERGY</small>
               <strong>{timeLeft.toFixed(1)}<i>s</i></strong>
-              <em>{clockRunning ? "RUNNING" : "PAUSED"}</em>
+              <em>{clockRunning ? "DRAINING" : "SAFE"}</em>
               <span className="equalizer" aria-hidden="true"><i /><i /><i /><i /><i /></span>
             </div>
           </div>
@@ -1107,9 +1196,9 @@ export default function Home() {
             <div className={`question-banner ${activeGate?.question.boss ? "boss-question" : ""}`}>
               <span>{activeGate?.question.tag ?? "READY"}</span>
               <div>
-                <small>{clockRunning ? "CHOOSE NOW — TIMER RUNNING" : feedback ? "READ THE TIP — TIMER PAUSED" : "LOOK AT THE QUESTION — TIMER PAUSED"}</small>
+                <small>{clockRunning ? "CHOOSE NOW — ENERGY DRAINING" : feedback ? "READ THE TIP — ENERGY SAFE" : "LOOK AT THE QUESTION — ENERGY SAFE"}</small>
                 <p>{activeGate?.question.prompt ?? "New code incoming…"}</p>
-                <i className="decision-track"><b style={{ width: activeGate?.decisionEndsAt ? `${Math.max(0, ((activeGate.decisionEndsAt - Date.now()) / DECISION_TIME_MS) * 100)}%` : "100%" }} /></i>
+                <i className="decision-track"><b key={`${activeGate?.id ?? "ready"}-${activeGate?.decisionEndsAt ?? "waiting"}`} className={activeGate?.decisionEndsAt ? "draining" : ""} /></i>
               </div>
             </div>
             <div className="lane-lines" aria-hidden="true"><i /><i /><i /></div>
@@ -1134,12 +1223,18 @@ export default function Home() {
                 aria-hidden="true"
               >Py</div>
             ))}
-            {feedback && <div className={`feedback ${feedback.good ? "good" : "bad"}`} role="status">{feedback.text}</div>}
+            {feedback && <div className={`feedback ${feedback.good ? "good" : "bad"}`} role="status"><strong>{feedback.text}</strong><span>{feedback.detail}</span></div>}
             <div className="speed-lines" aria-hidden="true" />
           </div>
 
           <div className="play-footer">
-            <div className="keys"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><span>CHOOSE LANE</span></div>
+            <div className="touch-lanes" aria-label="Choose an answer lane">
+              {[0, 1, 2].map((laneIndex) => (
+                <button type="button" key={laneIndex} className={lane === laneIndex ? "active" : ""} onClick={() => chooseLane(laneIndex)} aria-pressed={lane === laneIndex}>
+                  <kbd>{laneIndex + 1}</kbd><span>LANE {laneIndex + 1}</span>
+                </button>
+              ))}
+            </div>
             <p><b>BYTE SAYS:</b> {lastLesson}</p>
             <div className="round-progress"><span style={{ width: `${(timeLeft / MAX_ACTIVE_SECONDS) * 100}%` }} /></div>
           </div>
@@ -1156,10 +1251,11 @@ export default function Home() {
             <p>{playerName}, your Python power score is</p>
             <div className="final-score">{finalScore.toString().padStart(4, "0")}</div>
             <div className="result-recap">
+              <div><small>CODE ACCURACY</small><strong>{correctAnswers}/{questionsAnswered}</strong></div>
               <div><small>BEST POWER STREAK</small><strong>×{bestCombo}</strong></div>
               <div className="skill-recap">
-                <small>PYTHON SKILLS LEARNED</small>
-                <ul>{learnedTags.slice(-3).map((tag) => <li key={tag}>{SKILL_RECAP[tag]}</li>)}</ul>
+                <small>PYTHON SKILLS PRACTISED</small>
+                {learnedTags.length > 0 ? <ul>{learnedTags.slice(-3).map((tag) => <li key={tag}>{SKILL_RECAP[tag]}</li>)}</ul> : <p>Run again to master your first Python skill.</p>}
               </div>
             </div>
             <div className="result-actions">
@@ -1176,7 +1272,7 @@ export default function Home() {
         </section>
       )}
 
-      <footer className="site-footer"><span>HERITAGE ACADEMY • DIGITAL LITERACY</span><span>PYTHON DASH v1.3</span></footer>
+      <footer className="site-footer"><span>HERITAGE ACADEMY • DIGITAL LITERACY</span><span>PYTHON DASH v1.4</span></footer>
     </main>
   );
 }

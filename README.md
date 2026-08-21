@@ -1,6 +1,6 @@
 # Python Dash
 
-Python Dash is a bright, 40-second arcade runner created for Heritage Academy.
+Python Dash is a bright, five-gate arcade coding mission created for Heritage Academy.
 It introduces Primary 5 and Primary 6 students to simple Python code before
 they enter Secondary 1.
 
@@ -17,8 +17,8 @@ do not allow websites to start sound automatically.
 
 1. A student helper opens **Code Briefing** and explains the four large code
    examples.
-2. The player enters a name and completes one untimed practice question.
-3. The player starts the arcade run using the number and arrow keys.
+2. The player chooses a safe codename and completes an untimed answer-and-movement practice.
+3. The player clears five adaptive code gates and a guaranteed Python Boss using the keyboard or on-screen lane controls.
 4. Scores are saved only in that computer's browser.
 
 ## Development
