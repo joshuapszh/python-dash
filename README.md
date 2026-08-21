@@ -17,7 +17,7 @@ do not allow websites to start sound automatically.
 
 1. A student helper opens **Code Briefing** and explains the four large code
    examples.
-2. The player chooses a safe codename and completes an untimed answer-and-movement practice.
+2. The player enters a first name or chooses a safe codename, then completes an untimed answer-and-movement practice.
 3. The player clears five adaptive code gates and a guaranteed Python Boss using the keyboard or on-screen lane controls.
 4. Scores are saved only in that computer's browser.
 

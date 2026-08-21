@@ -1029,23 +1029,26 @@ export default function Home() {
               </button>
             </div>
             <div className="player-entry">
-              <label htmlFor="player-name">PLAYER CODENAME</label>
+              <label htmlFor="player-name">PLAYER NAME OR CODENAME</label>
               <div className="input-row">
                 <input
                   id="player-name"
                   value={playerName}
-                  readOnly
-                  placeholder="Choose a fun codename"
-                  aria-label="Generated player codename"
+                  onChange={(event) => setPlayerName(cleanName(event.target.value))}
+                  onKeyDown={(event) => { if (event.key === "Enter") openPractice(); }}
+                  placeholder="Type your first name"
+                  autoComplete="off"
+                  maxLength={24}
+                  aria-describedby="player-name-help"
                 />
                 <button className="codename-button" type="button" onClick={() => setPlayerName(makeCodename())}>
-                  {playerName ? "NEW CODENAME" : "CHOOSE CODENAME"}
+                  {playerName ? "NEW CODENAME" : "USE CODENAME"}
                 </button>
                 <button type="button" onClick={openPractice} disabled={!playerName.trim()}>
                   START PRACTICE <span>→</span>
                 </button>
               </div>
-              <p className="control-hint">Codenames keep the local leaderboard fun and student-safe.</p>
+              <p className="control-hint" id="player-name-help">Enter your first name only, or choose a fun codename.</p>
             </div>
           </div>
 
@@ -1272,7 +1275,7 @@ export default function Home() {
         </section>
       )}
 
-      <footer className="site-footer"><span>HERITAGE ACADEMY • DIGITAL LITERACY</span><span>PYTHON DASH v1.4</span></footer>
+      <footer className="site-footer"><span>HERITAGE ACADEMY • DIGITAL LITERACY</span><span>PYTHON DASH v1.5</span></footer>
     </main>
   );
 }
