@@ -15,6 +15,7 @@ test("ships a GitHub Pages build", async () => {
   assert.match(config, /base: "\/python-dash\/"/);
   assert.match(config, /\.\/docs/);
   assert.match(entry, /Python Dash \| Heritage Academy/);
+  assert.match(entry, /Defeat the Python Boss/);
   assert.match(entry, /joshuapszh\.github\.io\/python-dash\/og\.png/);
   assert.match(page, /src="\.\/heritage-academy\.png"/);
   assert.match(workflow, /actions\/upload-pages-artifact@v4/);

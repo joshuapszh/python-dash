@@ -10,18 +10,18 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: base,
     title: "Python Dash | Heritage Academy",
-    description: "A 40-second arcade code runner for incoming Secondary 1 students.",
+    description: "A five-gate arcade coding mission for incoming Secondary 1 students.",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
     openGraph: {
       title: "Python Dash | Heritage Academy",
-      description: "Read the code. Choose the answer. Beat 40 seconds.",
+      description: "Read the code. Power up. Defeat the Python Boss.",
       type: "website",
       images: [{ url: new URL("/og.png", base).toString(), width: 1200, height: 630, alt: "Python Dash arcade runner" }],
     },
     twitter: {
       card: "summary_large_image",
       title: "Python Dash | Heritage Academy",
-      description: "Read the code. Choose the answer. Beat 40 seconds.",
+      description: "Read the code. Power up. Defeat the Python Boss.",
       images: [new URL("/og.png", base).toString()],
     },
   };
