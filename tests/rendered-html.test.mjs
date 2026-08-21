@@ -43,7 +43,7 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /RESULTS_RESET_SECONDS = 25/);
   assert.match(page, /PYTHON SKILLS PRACTISED/);
   assert.match(page, /CODE ACCURACY/);
-  assert.match(page, /PYTHON DASH v1\.4/);
+  assert.match(page, /PYTHON DASH v1\.5/);
   assert.match(page, /master\.gain\.value = 1\.65/);
   assert.match(page, /createDynamicsCompressor/);
   assert.match(page, /UNTIMED PRACTICE/);
@@ -57,6 +57,10 @@ test("ships the complete Python Dash experience", async () => {
   assert.match(page, /regularGatesRef\.current >= MISSION_GATES/);
   assert.match(page, /practiceMoveComplete/);
   assert.match(page, /touch-lanes/);
+  assert.match(page, /PLAYER NAME OR CODENAME/);
+  assert.match(page, /onChange=\{\(event\) => setPlayerName\(cleanName\(event\.target\.value\)\)\}/);
+  assert.match(page, /Type your first name/);
+  assert.doesNotMatch(page, /readOnly/);
   assert.match(css, /Bright Cyber Carnival theme/);
   assert.match(css, /equalizer/);
   assert.match(css, /sound-gate/);
